@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>איך להתלבש היום</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007aff">
+<style>
+body{
+margin:0;
+font-family:-apple-system,BlinkMacSystemFont,system-ui;
+background:linear-gradient(#9fd3ff,#eaf6ff);
+}
+.container{
+max-width:420px;
+margin:auto;
+padding:20px;
+}
+.card{
+backdrop-filter:blur(20px);
+background:rgba(255,255,255,0.6);
+border-radius:20px;
+padding:16px;
+margin-top:14px;
+box-shadow:0 10px 25px rgba(0,0,0,0.15);
+}
+input{
+width:100%;
+padding:12px;
+border-radius:12px;
+border:none;
+font-size:16px;
+}
+button{
+background:#007aff;
+color:white;
+border:none;
+border-radius:12px;
+padding:10px 14px;
+margin-top:10px;
+}
+.weather{
+font-size:45px;
+}
+.temp{
+font-size:26px;
+font-weight:600;
+}
+.advice{
+margin-top:8px;
+font-size:18px;
+}
+canvas{
+width:100%;
+margin-top:15px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>איך להתלבש היום</h1>
+
+<div class="card">
+
+<input id="city" placeholder="הקלד עיר">
+
+<button onclick="loadWeather()">בדוק</button>
+
+<select id="sensitivity">
+<option value="cold">קר לי יותר מהממוצע</option>
+<option value="normal" selected>רגיל</option>
+<option value="hot">חם לי יותר מהממוצע</option>
+</select>
+
+</div>
+
+<div id="result"></div>
+
+<canvas id="chart" height="160"></canvas>
+
+</div>
+
+<script>
+
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('sw.js')
+}
+
+function icon(code){
+if(code==0) return "☀️"
+if(code<=2) return "🌤️"
+if(code<=3) return "☁️"
+if(code<=65) return "🌧️"
+if(code<=75) return "❄️"
+return "⛈️"
+}
+
+function windChill(temp,wind){
+return 13.12 + 0.6215*temp - 11.37*Math.pow(wind,0.16) + 0.3965*temp*Math.pow(wind,0.16)
+}
+
+function heatIndex(temp,humidity){
+return -8.784695 + 1.61139411*temp + 2.338549*humidity
+-0.14611605*temp*humidity
+-0.012308094*Math.pow(temp,2)
+-0.016424828*Math.pow(humidity,2)
+}
+
+function wetBulb(temp,humidity){
+return temp*Math.atan(0.151977*(humidity+8.313659)**0.5)
++Math.atan(temp+humidity)
+-Math.atan(humidity-1.676331)
++0.00391838*(humidity**1.5)*Math.atan(0.023101*humidity)
+-4.686035
+}
+
+function feelsLike(temp,wind,humidity){
+
+let feels=temp
+
+if(temp<=10 && wind>4)
+feels=windChill(temp,wind)
+
+if(temp>=26)
+feels=heatIndex(temp,humidity)
+
+let wet=wetBulb(temp,humidity)
+
+if(wet>28)
+feels+=2
+
+return feels
+}
+
+function clothing(feels,wind,rain,sens){
+
+if(sens=="cold") feels-=2
+if(sens=="hot") feels+=2
+
+let text=""
+let icon="👕"
+
+if(feels<5){
+text="מעיל חורף חם, צעיף ואולי כפפות"
+icon="🧥"
+}
+else if(feels<12){
+text="מעיל בינוני וחולצה ארוכה"
+icon="🧥"
+}
+else if(feels<18){
+text="חולצה ארוכה ועליונית"
+icon="👕"
+}
+else if(feels<24){
+text="חולצה קצרה ועליון דק"
+icon="👕"
+}
+else{
+text="בגדים קצרים וכובע לשמש"
+icon="🩳"
+}
+
+if(rain>2)
+text+=" + מטרייה"
+
+if(wind>35)
+text+=" (ייתכן שיהיה סוער)"
+
+return [text,icon]
+}
+
+function drawChart(y,t,m){
+
+let c=document.getElementById("chart")
+let ctx=c.getContext("2d")
+
+ctx.clearRect(0,0,c.width,c.height)
+
+let max=Math.max(y,t,m)+2
+let scale=120/max
+
+ctx.fillStyle="#007aff"
+
+ctx.fillRect(30,140-y*scale,40,y*scale)
+ctx.fillRect(120,140-t*scale,40,t*scale)
+ctx.fillRect(210,140-m*scale,40,m*scale)
+
+ctx.fillStyle="black"
+
+ctx.fillText("אתמול",25,155)
+ctx.fillText("היום",115,155)
+ctx.fillText("מחר",205,155)
+}
+
+async function loadWeather(){
+
+let city=document.getElementById("city").value
+
+let geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=he`)
+let g=await geo.json()
+
+if(!g.results){alert("עיר לא נמצאה");return}
+
+let lat=g.results[0].latitude
+let lon=g.results[0].longitude
+
+let weather=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,windspeed_10m_max,precipitation_sum&hourly=relativehumidity_2m&past_days=1&forecast_days=2&timezone=auto`)
+
+let d=await weather.json()
+
+let y=(d.daily.temperature_2m_max[0]+d.daily.temperature_2m_min[0])/2
+let t=(d.daily.temperature_2m_max[1]+d.daily.temperature_2m_min[1])/2
+let m=(d.daily.temperature_2m_max[2]+d.daily.temperature_2m_min[2])/2
+
+let wind=d.daily.windspeed_10m_max[1]
+let rain=d.daily.precipitation_sum[1]
+let humidity=d.hourly.relativehumidity_2m[12]
+
+let feels=feelsLike(t,wind,humidity)
+
+let sens=document.getElementById("sensitivity").value
+
+let today=clothing(feels,wind,rain,sens)
+let tomorrow=clothing(m,wind,0,sens)
+
+document.getElementById("result").innerHTML=`
+
+<div class="card">
+<div class="weather">${icon(d.daily.weathercode[1])}</div>
+<div class="temp">${t.toFixed(1)}°C</div>
+מרגיש כמו ${feels.toFixed(1)}°C
+<div class="advice">${today[1]} ${today[0]}</div>
+</div>
+
+<div class="card">
+<h3>מחר</h3>
+${m.toFixed(1)}°C
+<div class="advice">${tomorrow[1]} ${tomorrow[0]}</div>
+</div>
+`
+
+drawChart(y,t,m)
+}
+
+</script>
+
+</body>
+</html>
