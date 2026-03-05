@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A84FF" />
+  <title>Yeela Weather</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <style>
+    :root{
+      --bg1:#0b1220;
+      --bg2:#121a2b;
+      --glass: rgba(255,255,255,.12);
+      --glass2: rgba(255,255,255,.18);
+      --text: rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.70);
+      --stroke: rgba(255,255,255,.18);
+      --blue:#0A84FF;
+      --green:#34C759;
+      --orange:#FF9F0A;
+      --red:#FF453A;
+      --shadow: 0 18px 40px rgba(0,0,0,.35);
+      --r: 22px;
+
+      --pad-top: max(16px, env(safe-area-inset-top));
+      --pad-bottom: max(16px, env(safe-area-inset-bottom));
+      --pad-left: max(16px, env(safe-area-inset-left));
+      --pad-right: max(16px, env(safe-area-inset-right));
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 70% 10%, rgba(10,132,255,.18), transparent 55%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x:hidden;
+      min-height:100vh;
+    }
+
+    .bg{ position:fixed; inset:0; z-index:0; }
+    canvas#fx{ position:absolute; inset:0; width:100%; height:100%; }
+
+    .wrap{
+      position:relative;
+      z-index:2;
+      max-width: 430px;
+      margin: 0 auto;
+      padding: var(--pad-top) var(--pad-right) var(--pad-bottom) var(--pad-left);
+    }
+
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px;
+      padding: 8px 4px 14px;
+    }
+
+    .title{ display:flex; flex-direction:column; gap:2px; }
+    .title h1{
+      margin:0;
+      font-size: 26px;
+      letter-spacing:-0.3px;
+      font-weight: 700;
+    }
+    .title .sub{ font-size: 13px; color: var(--muted); }
+
+    .pill{
+      display:flex; align-items:center; gap:8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid var(--stroke);
+      box-shadow: 0 10px 22px rgba(0,0,0,.18);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .pill button{
+      appearance:none; border:0; background: transparent;
+      color: var(--text); font-size: 14px; padding:0; cursor:pointer;
+    }
+
+    .card{
+      background: linear-gradient(180deg, var(--glass2), var(--glass));
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow);
+      border-radius: var(--r);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      overflow:hidden;
+    }
+
+    .searchCard{
+      padding: 14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      position:relative;
+    }
+
+    .row{ display:flex; gap:10px; align-items:center; }
+    .input{ flex:1; position:relative; }
+
+    input[type="text"]{
+      width:100%;
+      padding: 14px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(10,10,15,.25);
+      color: var(--text);
+      outline:none;
+      font-size: 16px;
+    }
+    input::placeholder{color: rgba(255,255,255,.55)}
+
+    .btn{
+      border:0;
+      background: linear-gradient(180deg, rgba(10,132,255,1), rgba(10,132,255,.86));
+      color:white;
+      padding: 14px 14px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor:pointer;
+      box-shadow: 0 14px 28px rgba(10,132,255,.25);
+      white-space:nowrap;
+    }
+    .btn:active{transform: translateY(1px)}
+
+    .seg{
+      display:flex; gap:8px; padding: 8px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+    }
+    .seg button{
+      flex:1; border:0; cursor:pointer;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .seg button.active{
+      background: rgba(255,255,255,.16);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .suggest{
+      position:absolute;
+      top: 56px;
+      left:0; right:0;
+      border-radius: 16px;
+      background: rgba(20,24,35,.92);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+      overflow:hidden;
+      display:none;
+      z-index: 50;
+    }
+    .suggest .item{
+      padding: 12px 12px;
+      cursor:pointer;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .suggest .item:first-child{border-top:0}
+    .suggest .item:hover{background: rgba(255,255,255,.08)}
+    .suggest .name{font-weight:700}
+    .suggest .meta{color: var(--muted); font-size:12px; white-space:nowrap}
+
+    .favRow{ display:flex; gap:8px; flex-wrap:wrap; }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      cursor:pointer;
+      user-select:none;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .chip .x{
+      width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;
+      border-radius:999px;background: rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.12);
+      font-size: 12px;
+    }
+
+    .grid{ margin-top: 14px; display:grid; grid-template-columns: 1fr; gap: 12px; }
+
+    .hero{ padding: 16px 16px 14px; }
+    .heroTop{ display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+
+    .wIcon{
+      width: 64px; height: 64px;
+      display:grid; place-items:center;
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: 0 16px 28px rgba(0,0,0,.20);
+    }
+    .wIcon svg{width:44px;height:44px; display:block}
+
+    .bigTemp{
+      font-size: 46px;
+      font-weight: 800;
+      letter-spacing:-1.2px;
+      line-height:1;
+    }
+    .smallLine{
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+      line-height:1.4;
+    }
+
+    .kpis{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .kpi{
+      padding: 10px 10px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      text-align:center;
+    }
+    .kpi .v{font-weight:800; font-size:14px}
+    .kpi .l{font-size:11px;color:var(--muted);margin-top:4px}
+
+    .desc{
+      margin-top: 12px;
+      padding: 12px 12px;
+      border-radius: 16px;
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.12);
+      line-height:1.5;
+      font-size: 14px;
+    }
+
+    .days{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 14px;
+    }
+    .day{
+      padding: 12px 10px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      text-align:center;
+    }
+    .day .lbl{font-size:12px;color:var(--muted);font-weight:800}
+    .day .t{font-size:18px;font-weight:900;margin-top:8px}
+    .day .s{font-size:12px;color:var(--muted);margin-top:4px; line-height:1.35}
+    .day .mini{margin-top:8px}
+    .day .mini svg{width:22px;height:22px;opacity:.95}
+
+    .chartCard{ padding: 14px 14px 10px; }
+    .chartTitle{ display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; }
+    .chartTitle .h{ font-weight:900; letter-spacing:-0.2px; }
+    .chartTitle .m{ font-size:12px;color:var(--muted); }
+    #chart{
+      width:100%;
+      height: 180px;
+      display:block;
+      border-radius: 18px;
+      background: rgba(0,0,0,.16);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .foot{
+      padding: 14px 2px 0;
+      font-size: 12px;
+      color: rgba(255,255,255,.55);
+      text-align:center;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: rgba(20,24,35,.92);
+      border:1px solid rgba(255,255,255,.14);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.45);
+      z-index: 99;
+      display:none;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg">
+    <canvas id="fx"></canvas>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <div class="title">
+        <h1>Yeela Weather</h1>
+        <div class="sub">בחירת עיר • אתמול / היום / מחר • המלצת לבוש חכמה</div>
+      </div>
+
+      <div class="pill">
+        <button id="favAddBtn" title="שמור עיר למועדפים">★</button>
+        <button id="refreshBtn" title="רענון">↻</button>
+      </div>
+    </header>
+
+    <div class="card searchCard">
+      <div class="row">
+        <div class="input">
+          <input id="cityInput" type="text" placeholder="הקלד עיר (למשל: תל אביב, וינה, בודפשט)" autocomplete="off" />
+          <div id="suggest" class="suggest"></div>
+        </div>
+        <button id="goBtn" class="btn">הצג</button>
+      </div>
+
+      <div class="seg" aria-label="רגישות לקור">
+        <button data-sens="cold">קר לי יותר</button>
+        <button data-sens="normal" class="active">רגיל</button>
+        <button data-sens="hot">חם לי יותר</button>
+      </div>
+
+      <div class="favRow" id="favRow" aria-label="מועדפים"></div>
+    </div>
+
+    <div class="grid" id="content"></div>
+
+    <div class="foot">
+      נתונים: Open-Meteo • ללא GPS • נשמר מקומית במכשיר (מועדפים/העדפה)
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+const $ = (id)=>document.getElementById(id);
+function toast(msg){
+  const t=$('toast');
+  t.textContent=msg;
+  t.style.display='block';
+  clearTimeout(toast._tm);
+  toast._tm=setTimeout(()=>t.style.display='none', 2200);
+}
+function formatC(n){
+  if (n==null || Number.isNaN(n)) return '—';
+  return `${Math.round(n)}°`;
+}
+function describeDiff(todayAvg, yestAvg, todayRain, yestRain){
+  const d = todayAvg - yestAvg;
+  const rainChange = (todayRain||0) - (yestRain||0);
+  let tPart;
+  if (d >= 6) tPart = "עלייה משמעותית בטמפרטורה ביחס לאתמול.";
+  else if (d >= 2) tPart = "מעט חם יותר מאתמול.";
+  else if (d <= -6) tPart = "התקררות משמעותית ביחס לאתמול.";
+  else if (d <= -2) tPart = "מעט קר יותר מאתמול.";
+  else tPart = "טמפרטורה דומה לאתמול.";
+  let rPart="";
+  if (rainChange >= 5) rPart=" צפוי יותר גשם מאתמול.";
+  else if (rainChange <= -5) rPart=" יש פחות גשם מאתמול / ייתכן שייפסק.";
+  else if ((todayRain||0) >= 1) rPart=" יש סיכוי/כמות גשם היום.";
+  else rPart=" לא צפוי גשם משמעותי היום.";
+  return tPart + rPart;
+}
+function windChillC(tC, windKmh){
+  const v = windKmh;
+  return 13.12 + 0.6215*tC - 11.37*Math.pow(v,0.16) + 0.3965*tC*Math.pow(v,0.16);
+}
+function heatIndexC(tC, rh){
+  return -8.784695 + 1.61139411*tC + 2.338549*rh
+    -0.14611605*tC*rh
+    -0.012308094*(tC**2)
+    -0.016424828*(rh**2)
+    +0.002211732*(tC**2)*rh
+    +0.00072546*tC*(rh**2)
+    -0.000003582*(tC**2)*(rh**2);
+}
+function wetBulbApproxC(tC, rh){
+  return tC*Math.atan(0.151977*Math.sqrt(rh + 8.313659))
+    + Math.atan(tC + rh)
+    - Math.atan(rh - 1.676331)
+    + 0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)
+    - 4.686035;
+}
+function feelsLikeC(tC, windKmh, rh){
+  let f = tC;
+  if (tC <= 10 && windKmh > 5) f = windChillC(tC, windKmh);
+  if (tC >= 26 && rh >= 40) f = heatIndexC(tC, rh);
+  const wb = wetBulbApproxC(tC, rh);
+  if (wb >= 28) f += 2;
+  return f;
+}
+function clothingAdvice({feels, wind, rain, sens}){
+  let x = feels;
+  if (sens==='cold') x -= 2;
+  if (sens==='hot') x += 2;
+
+  const windy = wind >= 35;
+  const breezy = wind >= 22;
+  const wet = rain >= 2;
+  const drizzle = rain >= 0.5;
+
+  let top="", outer="", bottom="", extras=[];
+  if (x < 2){ top="חולצה תרמית/ארוכה"; outer="מעיל חורף חם"; bottom="מכנס ארוך חם"; extras.push("צעיף"); extras.push("אולי כפפות"); }
+  else if (x < 8){ top="חולצה ארוכה"; outer="מעיל חם/פוך קל"; bottom="מכנס ארוך"; extras.push("שכבה נוספת אם אתה רגיש לקור"); }
+  else if (x < 13){ top="חולצה ארוכה"; outer="ג׳קט/מעיל בינוני"; bottom="מכנס ארוך"; }
+  else if (x < 18){ top="חולצה ארוכה דקה"; outer="עליונית/סווטשרט"; bottom="מכנס ארוך (או קצר אם חם לך)"; }
+  else if (x < 23){ top="חולצה קצרה"; outer="עליונית דקה לערב"; bottom="מכנס קצר/ארוך קל"; }
+  else if (x < 28){ top="חולצה קצרה ונושמת"; outer="ללא (אפשר שכבה דקה ממוזג)"; bottom="בגדים קצרים"; extras.push("כובע"); }
+  else { top="בגדים קלים מאוד"; outer="ללא"; bottom="קצר מאוד ונושם"; extras.push("כובע"); extras.push("מים"); }
+
+  if (breezy) extras.push("שכבה חוסמת רוח (רוח מורגשת)");
+  if (windy) extras.push("עדיף מעיל/שכבה נגד רוח");
+  if (drizzle) extras.push("מטרייה קטנה/כובע");
+  if (wet) extras.push("מטרייה + נעליים סגורות/עמידות");
+
+  const parts = [`עליון: ${top}`, `שכבה חיצונית: ${outer}`, `תחתון: ${bottom}`];
+  if (extras.length) parts.push(`תוספות: ${[...new Set(extras)].join(" • ")}`);
+  return parts.join("<br>");
+}
+function svgIcon(type){
+  const common = `fill="none" stroke="rgba(255,255,255,.92)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"`;
+  if (type==='sun') return `<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="8" ${common}></circle><path d="M24 4v6M24 38v6M4 24h6M38 24h6M8.5 8.5l4.2 4.2M35.3 35.3l4.2 4.2M39.5 8.5l-4.2 4.2M12.7 35.3l-4.2 4.2" ${common}></path></svg>`;
+  if (type==='cloud') return `<svg viewBox="0 0 48 48"><path d="M16 34h18a8 8 0 0 0 0-16 11 11 0 0 0-21-2A7 7 0 0 0 16 34Z" ${common}></path></svg>`;
+  if (type==='rain') return `<svg viewBox="0 0 48 48"><path d="M16 28h18a8 8 0 0 0 0-16 11 11 0 0 0-21-2A7 7 0 0 0 16 28Z" ${common}></path><path d="M18 34l-2 6M26 34l-2 6M34 34l-2 6" ${common}></path></svg>`;
+  if (type==='snow') return `<svg viewBox="0 0 48 48"><path d="M16 26h18a8 8 0 0 0 0-16 11 11 0 0 0-21-2A7 7 0 0 0 16 26Z" ${common}></path><circle cx="18" cy="34" r="1.7" fill="rgba(255,255,255,.92)"></circle><circle cx="26" cy="36" r="1.7" fill="rgba(255,255,255,.92)"></circle><circle cx="34" cy="34" r="1.7" fill="rgba(255,255,255,.92)"></circle></svg>`;
+  if (type==='storm') return `<svg viewBox="0 0 48 48"><path d="M16 26h18a8 8 0 0 0 0-16 11 11 0 0 0-21-2A7 7 0 0 0 16 26Z" ${common}></path><path d="M26 28l-6 10h6l-4 8" ${common}></path></svg>`;
+  if (type==='night') return `<svg viewBox="0 0 48 48"><path d="M30 38c-10 0-18-8-18-18 0-6 3-12 8-15-1 2-2 4-2 7 0 9 7 16 16 16 3 0 5-1 7-2-3 7-10 12-11 12Z" ${common}></path><circle cx="36" cy="14" r="1.6" fill="rgba(255,255,255,.9)"></circle><circle cx="40" cy="20" r="1.2" fill="rgba(255,255,255,.75)"></circle></svg>`;
+  return svgIcon('cloud');
+}
+function iconTypeFromCode(code, isNight){
+  if (isNight && (code===0 || code<=3)) return 'night';
+  if (code===0) return 'sun';
+  if (code<=3) return 'cloud';
+  if ((code>=51 && code<=67) || (code>=80 && code<=82)) return 'rain';
+  if ((code>=71 && code<=77) || (code>=85 && code<=86)) return 'snow';
+  if (code>=95) return 'storm';
+  return 'cloud';
+}
+
+/* background animations */
+const fx = $('fx');
+const ctx = fx.getContext('2d');
+let W=0,H=0, particles=[], mode='cloud', raf=0;
+function resize(){ W = fx.width = Math.floor(window.innerWidth * devicePixelRatio); H = fx.height = Math.floor(window.innerHeight * devicePixelRatio); }
+window.addEventListener('resize', resize); resize();
+function setTheme(t){
+  const b = document.body.style;
+  if (t==='sun') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(255,214,10,.25), transparent 55%), linear-gradient(180deg, #0b3a7a, #0b1220)`;
+  else if (t==='cloud') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(180,190,210,.18), transparent 55%), linear-gradient(180deg, #1a2436, #0b1220)`;
+  else if (t==='rain') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(10,132,255,.18), transparent 55%), linear-gradient(180deg, #0f2238, #08121f)`;
+  else if (t==='snow') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(255,255,255,.18), transparent 55%), linear-gradient(180deg, #122033, #08121f)`;
+  else if (t==='storm') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(170,120,255,.14), transparent 55%), linear-gradient(180deg, #120f22, #070a14)`;
+  else if (t==='night') b.background = `radial-gradient(900px 600px at 70% 10%, rgba(150,200,255,.10), transparent 55%), linear-gradient(180deg, #070a14, #050712)`;
+}
+function makeParticle(m){
+  const x = Math.random()*W, y = Math.random()*H;
+  if (m==='rain' || m==='storm') return {x,y,vy:(8+Math.random()*14)*devicePixelRatio, vx:(-2+Math.random()*4)*devicePixelRatio, len:(10+Math.random()*16)*devicePixelRatio, a:0.35+Math.random()*0.35};
+  if (m==='snow') return {x,y,vy:(1.2+Math.random()*2.2)*devicePixelRatio, vx:(-0.8+Math.random()*1.6)*devicePixelRatio, r:(1.2+Math.random()*2.6)*devicePixelRatio, a:0.35+Math.random()*0.45};
+  if (m==='sun') return {x,y,vy:(0.35+Math.random()*0.8)*devicePixelRatio, r:(1.2+Math.random()*2.8)*devicePixelRatio, a:0.06+Math.random()*0.10};
+  if (m==='night') return {x,y,vy:(0.15+Math.random()*0.35)*devicePixelRatio, r:(0.9+Math.random()*2.2)*devicePixelRatio, a:0.10+Math.random()*0.18};
+  return {x,y,vy:(0.25+Math.random()*0.65)*devicePixelRatio, vx:(0.25+Math.random()*0.85)*devicePixelRatio, r:(18+Math.random()*44)*devicePixelRatio, a:0.03+Math.random()*0.06};
+}
+function resetParticles(newMode){
+  mode=newMode; particles=[]; cancelAnimationFrame(raf);
+  const count = (mode==='rain')?260:(mode==='snow')?140:(mode==='storm')?260:(mode==='sun')?70:(mode==='night')?80:90;
+  for(let i=0;i<count;i++) particles.push(makeParticle(mode));
+  loop();
+}
+function loop(){
+  ctx.clearRect(0,0,W,H);
+  if (mode==='sun'){
+    const g = ctx.createRadialGradient(W*0.75, H*0.15, 0, W*0.75, H*0.15, Math.max(W,H)*0.8);
+    g.addColorStop(0,'rgba(255,214,10,0.10)'); g.addColorStop(1,'rgba(255,214,10,0.00)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    particles.forEach(p=>{ ctx.beginPath(); ctx.fillStyle=`rgba(255,255,255,${p.a})`; ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); p.y+=p.vy; if(p.y>H){p.y=-20*devicePixelRatio; p.x=Math.random()*W;} });
+  } else if (mode==='cloud'){
+    particles.forEach(p=>{ ctx.beginPath(); ctx.fillStyle=`rgba(255,255,255,${p.a})`; ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); p.x+=p.vx; p.y+=p.vy*0.25; if(p.x>W+80*devicePixelRatio){p.x=-80*devicePixelRatio;p.y=Math.random()*H;p.r=(18+Math.random()*44)*devicePixelRatio;} if(p.y>H+80*devicePixelRatio){p.y=-80*devicePixelRatio;} });
+  } else if (mode==='rain' || mode==='storm'){
+    ctx.strokeStyle = (mode==='storm') ? 'rgba(220,220,255,0.65)' : 'rgba(200,230,255,0.55)';
+    ctx.lineWidth = 1.6*devicePixelRatio;
+    particles.forEach(p=>{ ctx.globalAlpha=p.a; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+p.vx*0.8,p.y+p.len); ctx.stroke(); p.x+=p.vx; p.y+=p.vy; if(p.y>H){p.y=-40*devicePixelRatio;p.x=Math.random()*W;} if(p.x<-40*devicePixelRatio)p.x=W+40*devicePixelRatio; if(p.x>W+40*devicePixelRatio)p.x=-40*devicePixelRatio; });
+    ctx.globalAlpha=1;
+    if(mode==='storm' && Math.random()<0.012){ ctx.fillStyle='rgba(255,255,255,0.14)'; ctx.fillRect(0,0,W,H); }
+  } else if (mode==='snow'){
+    particles.forEach(p=>{ ctx.beginPath(); ctx.fillStyle=`rgba(255,255,255,${p.a})`; ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); p.x+=p.vx; p.y+=p.vy; if(p.y>H){p.y=-20*devicePixelRatio;p.x=Math.random()*W;} if(p.x<-20*devicePixelRatio)p.x=W+20*devicePixelRatio; if(p.x>W+20*devicePixelRatio)p.x=-20*devicePixelRatio; });
+  } else if (mode==='night'){
+    particles.forEach(p=>{ ctx.beginPath(); ctx.fillStyle=`rgba(255,255,255,${p.a})`; ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill(); p.y+=p.vy; if(p.y>H){p.y=-10*devicePixelRatio;p.x=Math.random()*W;} });
+  }
+  raf=requestAnimationFrame(loop);
+}
+
+/* chart */
+function drawChart(canvas, points, labels){
+  const c=canvas, dpr=devicePixelRatio||1;
+  const cssW=c.clientWidth, cssH=c.clientHeight;
+  c.width=Math.floor(cssW*dpr); c.height=Math.floor(cssH*dpr);
+  const g=c.getContext('2d'); g.clearRect(0,0,c.width,c.height);
+  const pad=18*dpr, w=c.width-pad*2, h=c.height-pad*2;
+  const min=Math.min(...points), max=Math.max(...points), span=Math.max(1,max-min);
+  const yy=(v)=> pad + (max-v)/span*h;
+  g.strokeStyle='rgba(255,255,255,0.10)'; g.lineWidth=1*dpr;
+  for(let i=0;i<4;i++){ const y=pad+(h/3)*i; g.beginPath(); g.moveTo(pad,y); g.lineTo(pad+w,y); g.stroke(); }
+  const xStep=w/(points.length-1);
+  const pts=points.map((v,i)=>({x:pad+xStep*i,y:yy(v)}));
+  g.beginPath(); g.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length-1;i++){ const cx=(pts[i].x+pts[i+1].x)/2, cy=(pts[i].y+pts[i+1].y)/2; g.quadraticCurveTo(pts[i].x,pts[i].y,cx,cy); }
+  g.quadraticCurveTo(pts[pts.length-1].x,pts[pts.length-1].y,pts[pts.length-1].x,pts[pts.length-1].y);
+  const grad=g.createLinearGradient(pad,pad,pad+w,pad); grad.addColorStop(0,'rgba(10,132,255,0.95)'); grad.addColorStop(1,'rgba(52,199,89,0.85)');
+  g.strokeStyle=grad; g.lineWidth=3*dpr; g.lineCap='round'; g.lineJoin='round'; g.stroke();
+  g.lineTo(pts[pts.length-1].x,pad+h); g.lineTo(pts[0].x,pad+h); g.closePath();
+  const fill=g.createLinearGradient(0,pad,0,pad+h); fill.addColorStop(0,'rgba(10,132,255,0.22)'); fill.addColorStop(1,'rgba(10,132,255,0.02)');
+  g.fillStyle=fill; g.fill();
+  pts.forEach((p,i)=>{
+    g.beginPath(); g.fillStyle='rgba(255,255,255,0.92)'; g.arc(p.x,p.y,4.2*dpr,0,Math.PI*2); g.fill();
+    g.font=`${12*dpr}px -apple-system,BlinkMacSystemFont,system-ui`; g.textAlign='center';
+    g.fillStyle='rgba(255,255,255,0.88)'; g.fillText(`${Math.round(points[i])}°`, p.x, p.y-10*dpr);
+    g.fillStyle='rgba(255,255,255,0.55)'; g.fillText(labels[i], p.x, pad+h+16*dpr);
+  });
+}
+
+let selectedCity=null;
+let sens=localStorage.getItem('sens')||'normal';
+function setSensUI(){ document.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('active', b.dataset.sens===sens)); }
+setSensUI();
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{ sens=b.dataset.sens; localStorage.setItem('sens',sens); setSensUI(); if(selectedCity) loadAndRender(selectedCity);}));
+$('refreshBtn').addEventListener('click',()=>{ if(selectedCity) loadAndRender(selectedCity); else toast("בחר עיר קודם"); });
+$('goBtn').addEventListener('click',()=>{ const v=$('cityInput').value.trim(); if(!v) return toast("הקלד עיר"); geocodeOne(v).then(c=>{ if(!c) return toast("לא מצאתי עיר כזו"); selectCity(c,true); }); });
+$('favAddBtn').addEventListener('click',()=>{ if(!selectedCity) return toast("בחר עיר כדי לשמור למועדפים"); addFavorite(selectedCity); });
+function isNightNow(){ const h=new Date().getHours(); return (h>=20 || h<6); }
+async function geocode(query){
+  const url=`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=he&format=json`;
+  const r=await fetch(url,{cache:'no-store'}); if(!r.ok) return []; const j=await r.json();
+  return (j.results||[]).map(x=>({name:x.name,country:x.country||'',admin1:x.admin1||'',lat:x.latitude,lon:x.longitude}));
+}
+async function geocodeOne(query){ const res=await geocode(query); return res[0]||null; }
+function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+function renderSuggest(items){
+  const box=$('suggest');
+  if(!items.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML = items.map((c,i)=>`
+    <div class="item" data-i="${i}">
+      <div><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml([c.admin1,c.country].filter(Boolean).join(" • "))}</div></div>
+      <div class="meta">בחר</div>
+    </div>`).join('');
+  box.style.display='block';
+  [...box.querySelectorAll('.item')].forEach(el=>el.addEventListener('click',()=>{ const c=items[Number(el.dataset.i)]; selectCity(c,true); box.style.display='none'; }));
+}
+let debounceT=null;
+$('cityInput').addEventListener('input',()=>{
+  const q=$('cityInput').value.trim(); selectedCity=null; clearTimeout(debounceT);
+  if(q.length<2){ renderSuggest([]); return; }
+  debounceT=setTimeout(async()=>{ try{ renderSuggest(await geocode(q)); }catch{ renderSuggest([]); } },220);
+});
+document.addEventListener('click',(e)=>{ if(!e.target.closest('.input')) $('suggest').style.display='none'; });
+function selectCity(c, shouldLoad){ selectedCity=c; $('cityInput').value=c.name; localStorage.setItem('lastCity', JSON.stringify(c)); if(shouldLoad) loadAndRender(c); }
+
+function keyCity(c){ return `${c.name}|${c.admin1}|${c.country}|${c.lat.toFixed(3)}|${c.lon.toFixed(3)}`; }
+function readFav(){ try{ return JSON.parse(localStorage.getItem('favCities')||'[]'); }catch{ return []; } }
+function writeFav(list){ localStorage.setItem('favCities', JSON.stringify(list)); renderFav(); }
+function addFavorite(c){
+  const list=readFav(); const k=keyCity(c);
+  if(list.some(x=>x.k===k)) return toast("כבר במועדפים");
+  list.unshift({k,c}); writeFav(list.slice(0,10)); toast("נשמר במועדפים ★");
+}
+function removeFavorite(k){ writeFav(readFav().filter(x=>x.k!==k)); }
+function renderFav(){
+  const list=readFav(); const row=$('favRow');
+  row.innerHTML = list.length ? list.map(x=>`
+    <div class="chip" data-k="${escapeHtml(x.k)}">${escapeHtml(x.c.name)}<span class="x" title="הסר">×</span></div>
+  `).join('') : `<div style="color:rgba(255,255,255,.55);font-size:12px;padding:2px 2px;">מועדפים: עדיין אין</div>`;
+  [...row.querySelectorAll('.chip')].forEach(ch=>{
+    ch.addEventListener('click',(e)=>{
+      const k=ch.dataset.k; const item=list.find(x=>x.k===k); if(!item) return;
+      if(e.target.classList.contains('x')){ removeFavorite(k); toast("הוסר מהמועדפים"); return; }
+      selectCity(item.c,true);
+    });
+  });
+}
+renderFav();
+
+async function loadAndRender(city){
+  toast("טוען…");
+  const dailyParams=["temperature_2m_max","temperature_2m_min","weathercode","windspeed_10m_max","precipitation_sum"].join(",");
+  const hourlyParams=["relativehumidity_2m"].join(",");
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(city.lat)}&longitude=${encodeURIComponent(city.lon)}&daily=${dailyParams}&hourly=${hourlyParams}&past_days=1&forecast_days=2&timezone=auto`;
+  const r=await fetch(url,{cache:'no-store'}); if(!r.ok){ toast("שגיאת רשת"); return; }
+  const d=await r.json();
+
+  const yMax=d.daily.temperature_2m_max?.[0], yMin=d.daily.temperature_2m_min?.[0];
+  const tMax=d.daily.temperature_2m_max?.[1], tMin=d.daily.temperature_2m_min?.[1];
+  const mMax=d.daily.temperature_2m_max?.[2], mMin=d.daily.temperature_2m_min?.[2];
+  const yAvg=(yMax+yMin)/2, tAvg=(tMax+tMin)/2, mAvg=(mMax+mMin)/2;
+
+  const codeToday=d.daily.weathercode?.[1] ?? 3;
+  const windToday=d.daily.windspeed_10m_max?.[1] ?? 0;
+  const rainToday=d.daily.precipitation_sum?.[1] ?? 0;
+  const rainY=d.daily.precipitation_sum?.[0] ?? 0;
+  const rainM=d.daily.precipitation_sum?.[2] ?? 0;
+
+  const rh=(d.hourly?.relativehumidity_2m?.[12] ?? 55);
+  const feels=feelsLikeC(tAvg, windToday, rh);
+  const feelsTomorrow=feelsLikeC(mAvg, d.daily.windspeed_10m_max?.[2] ?? windToday, rh);
+  const diffText=describeDiff(tAvg, yAvg, rainToday, rainY);
+
+  const night=isNightNow();
+  const tType=iconTypeFromCode(codeToday, night);
+  setTheme(tType);
+  resetParticles(tType);
+
+  const cityLine=[city.admin1, city.country].filter(Boolean).join(" • ");
+  const adviceToday=clothingAdvice({feels, wind:windToday, rain:rainToday, sens});
+  const adviceTomorrow=clothingAdvice({feels:feelsTomorrow, wind:(d.daily.windspeed_10m_max?.[2] ?? windToday), rain:rainM, sens});
+
+  $('content').innerHTML = `
+    <div class="card hero">
+      <div class="heroTop">
+        <div>
+          <div style="font-size:13px;color:var(--muted);font-weight:800;">${escapeHtml(city.name)}${cityLine ? " • "+escapeHtml(cityLine) : ""}</div>
+          <div class="bigTemp">${formatC(tAvg)}</div>
+          <div class="smallLine">מרגיש כמו <b>${formatC(feels)}</b> • רוח ${Math.round(windToday)} קמ״ש • לחות ~${Math.round(rh)}% • גשם ${Math.round(rainToday*10)/10} מ״מ</div>
+        </div>
+        <div class="wIcon">${svgIcon(tType)}</div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="v">${formatC(tMax)}</div><div class="l">מקס׳ היום</div></div>
+        <div class="kpi"><div class="v">${formatC(tMin)}</div><div class="l">מינ׳ היום</div></div>
+        <div class="kpi"><div class="v">${formatC(tAvg-yAvg)}</div><div class="l">הפרש מול אתמול</div></div>
+      </div>
+
+      <div class="desc"><b>מה השתנה?</b><br>${escapeHtml(diffText)}</div>
+      <div class="desc"><b>המלצת לבוש להיום</b><br>${adviceToday}</div>
+    </div>
+
+    <div class="card">
+      <div class="days">
+        ${dayCard("אתמול", yAvg, d.daily.weathercode?.[0] ?? 3, `גשם ${Math.round(rainY*10)/10} מ״מ`, false)}
+        ${dayCard("היום", tAvg, codeToday, `מורגש ${formatC(feels)}`, night)}
+        ${dayCard("מחר", mAvg, d.daily.weathercode?.[2] ?? codeToday, `גשם ${Math.round(rainM*10)/10} מ״מ`, false)}
+      </div>
+      <div style="padding:0 14px 14px;">
+        <div class="desc"><b>המלצת לבוש למחר</b><br>${adviceTomorrow}</div>
+      </div>
+    </div>
+
+    <div class="card chartCard">
+      <div class="chartTitle">
+        <div class="h">טמפרטורה ממוצעת (אתמול/היום/מחר)</div>
+        <div class="m">גרף מודרני • עובד גם אופליין</div>
+      </div>
+      <canvas id="chart"></canvas>
+    </div>
+  `;
+
+  drawChart($('chart'), [yAvg, tAvg, mAvg], ["אתמול","היום","מחר"]);
+  toast("עודכן");
+}
+function dayCard(label, avg, code, sub, isNight){
+  const t=iconTypeFromCode(code, isNight);
+  return `<div class="day"><div class="lbl">${label}</div><div class="mini">${svgIcon(t)}</div><div class="t">${formatC(avg)}</div><div class="s">${escapeHtml(sub)}</div></div>`;
+}
+(function init(){
+  try{
+    const last=JSON.parse(localStorage.getItem('lastCity')||'null');
+    if(last && last.name && typeof last.lat==='number'){
+      selectedCity=last;
+      $('cityInput').value=last.name;
+      loadAndRender(last);
+    }
+  }catch{}
+})();
+</script>
+</body>
+</html>
